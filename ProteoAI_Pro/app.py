@@ -493,9 +493,7 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
     # -----------------------------------------------------------------
     st.markdown("**Step 1: Log2 Transformation**")
     st.caption(
-        "Formula: **Log2(Protein Intensity)** — strict log2, no pseudo-count/constant. "
-        "Requires every value to already be strictly positive (no zeros, negatives, or "
-        "missing values) — run Data Cleaning & Imputation first if that isn't the case yet."
+        "Formula: **Log2(Protein Intensity)**"
     )
     if st.button("Apply Log2 Transformation", key=f"{key_prefix}_log2_btn"):
         try:
@@ -596,11 +594,7 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
 
     elif method == "Median Centering Normalization":
         st.caption(
-            "Formula: **X_norm = X − Median(Sample) + Grand Median**. For each sample, "
-            "subtracts that sample's own median (computed across proteins) so every sample is "
-            "recentered to the same level, correcting systematic sample-to-sample loading "
-            "offsets; the grand median (median of all per-sample medians) is added back so the "
-            "overall scale is preserved rather than collapsed to zero. Applied to log2 values."
+            "Formula: **X_norm = X − Median(Sample) + Grand Median**"
             + (" The reference/pooled channel selected above is excluded from the calculation "
                "and dropped from the output." if is_tmt else "")
         )
@@ -696,7 +690,7 @@ with TABS[5]:
 
         st.caption(
             "Log2FC, p-value, FDR, and Significant are computed from the log2-transformed, "
-            "normalized data — raw protein intensities are not used for inference."
+            "normalized data."
         )
 
         mode = st.radio("Comparison type", ["Two-group comparison", "ANOVA (≥3 groups)"], horizontal=True)
@@ -736,8 +730,6 @@ with TABS[5]:
                     file_name=f"{comparison_name}_Statistics.csv", mime="text/csv",
                     key="dl_stats_twogroup"
                 )
-                st.caption(f"Filename includes the comparison ({comparison_name}) so results from "
-                           "different comparisons stay distinguishable.")
 
         else:
             if len(groups_available) < 3:
@@ -855,7 +847,6 @@ with TABS[4]:
                             f"Color: {g}", default_swatches[i % len(default_swatches)], key=f"pca_color_{g}"
                         )
 
-            st.caption("Optional: assign a marker style per group (defaults to circles for all).")
             marker_map = {}
             marker_cols = st.columns(min(4, len(selected_pca_groups)) or 1)
             for i, g in enumerate(selected_pca_groups):
@@ -1642,17 +1633,6 @@ def render_significant_protein_selector(key_prefix: str):
 # ===========================================================================
 with TABS[10]:
     st.header("Gene Set Enrichment Analysis")
-    st.caption(
-        "Three statistically-distinct methods: **STRING Enrichment Analysis** (Szklarczyk et "
-        "al. 2023) needs only a protein list and computes enrichment server-side against "
-        "STRING's own database; **Over-Representation Analysis (ORA)** is a hypergeometric "
-        "test computed locally against a chosen gene-set library, using your full comparison "
-        "list against an explicit background/universe; **Gene Set Enrichment Analysis (GSEA)** "
-        "(Subramanian et al. 2005) ranks every detected protein and tests where each gene set "
-        "falls in that ranking — a genuinely different algorithm from ORA, never used as a "
-        "substitute for it. **STRING and ORA/GSEA's Enrichr-backed libraries require internet "
-        "access**; GSEA can run fully offline if you upload your own .gmt gene set file."
-    )
     sig_proteins, stats_df, stats_by_gene = render_significant_protein_selector("gsea")
 
     if stats_df is not None:
@@ -1945,13 +1925,6 @@ with TABS[10]:
 # ===========================================================================
 with TABS[11]:
     st.header("Protein-Protein Interaction Network")
-    st.caption(
-        "Powered by the STRING database (Szklarczyk et al. 2023, *Nucleic Acids Research*), "
-        "the most widely used protein-protein interaction resource in proteomics — combining "
-        "physical interactions and functional associations from experiments, curated "
-        "databases, co-expression, and text-mining into one confidence score per pair. "
-        "**Requires internet access** (calls the public STRING API)."
-    )
     sig_proteins_ppi, stats_df_ppi, stats_by_gene_ppi = render_significant_protein_selector("ppi")
 
     if stats_df_ppi is not None:

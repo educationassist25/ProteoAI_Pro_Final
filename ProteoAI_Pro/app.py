@@ -492,10 +492,7 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
     # Step 1: Log2 Transformation (runs first, on the raw QC-validated intensities)
     # -----------------------------------------------------------------
     st.markdown("**Step 1: Log2 Transformation**")
-    st.caption(
-        "Formula: **Log2(Protein Intensity)**"
-    )
-    if st.button("Apply Log2 Transformation", key=f"{key_prefix}_log2_btn"):
+        if st.button("Apply Log2 Transformation", key=f"{key_prefix}_log2_btn"):
         try:
             log2_raw, _ = normalization.log2_transform(base_df)
         except ValueError as e:
@@ -556,12 +553,7 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
     st.markdown("**Step 2: Normalization**")
 
     if method == "Reference-Channel Normalization":
-        st.caption(
-            "Formula: **Normalized Log2 Intensity = Log2(Channel) − Log2(Reference Channel)** "
-            "— a log-ratio subtraction (equivalent to dividing the linear-scale channel by the "
-            "reference channel), computed directly on the Step 1 log2 values. Pick the sample "
-            "column that is the pooled/bridge reference channel included in the TMT plex."
-        )
+        
         istd_choice = st.selectbox("Select reference/pooled channel (sample column)",
                                     log2_raw.columns.tolist(), key=f"{key_prefix}_istd_choice")
         if st.button("Apply Reference-Channel Normalization", key=f"{key_prefix}_apply_istd"):
@@ -574,14 +566,7 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
                 st.error(str(e))
 
     elif method == "IQR Normalization":
-        st.caption(
-            "Formula: **X_norm = (X − Median(X)) ÷ IQR(X)**, computed per protein across "
-            "samples (feature-based) or per sample across proteins (sample-based), applied to "
-            "the **log2-transformed** protein intensities. Robust scaling is less sensitive "
-            "to outliers than mean/SD scaling — a standard choice for label-free proteomics, "
-            "where there's no shared spiked reference across every channel."
-        )
-        iqr_axis = st.radio("Normalization axis", ["feature", "sample", "batch"], horizontal=True,
+                iqr_axis = st.radio("Normalization axis", ["feature", "sample", "batch"], horizontal=True,
                              index=0, key=f"{key_prefix}_iqr_axis")
         if st.button("Apply IQR Normalization", key=f"{key_prefix}_iqr_untargeted_btn"):
             batch_map = meta["Batch"] if iqr_axis == "batch" else None
@@ -593,11 +578,7 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
             st.success(f"IQR normalization complete ({iqr_axis}-based).")
 
     elif method == "Median Centering Normalization":
-        st.caption(
-            "Formula: **X_norm = X − Median(Sample) + Grand Median**"
-            + (" The reference/pooled channel selected above is excluded from the calculation "
-               "and dropped from the output." if is_tmt else "")
-        )
+        
         exclude_cols = [ref_choice] if (is_tmt and ref_choice) else None
         if st.button("Apply Median Centering Normalization", key=f"{key_prefix}_apply_mediancenter"):
             working = normalization.median_center_normalize(log2_raw, exclude_cols=exclude_cols)
@@ -609,15 +590,7 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
             st.success("Median centering normalization complete.")
 
     elif method == "Global MAD-based Variance Scaling":
-        st.caption(
-            "Formula: **X_norm = X ÷ (MAD_global × 1.4826)**. A single MAD is computed across "
-            "the entire dataset at once (not per-protein or per-sample) and used as one global "
-            "scaling factor, standardizing overall variance/spread in one step (the 1.4826 "
-            "constant rescales MAD to be comparable to a standard deviation). Applied to log2 values."
-            + (" The reference/pooled channel selected above is excluded from the calculation "
-               "and dropped from the output." if is_tmt else "")
-        )
-        exclude_cols = [ref_choice] if (is_tmt and ref_choice) else None
+                exclude_cols = [ref_choice] if (is_tmt and ref_choice) else None
         if st.button("Apply Global MAD-based Variance Scaling", key=f"{key_prefix}_apply_madscale"):
             working, mad_scale_used = normalization.mad_scale_normalize(log2_raw, exclude_cols=exclude_cols)
             state[state_key_normalized] = working

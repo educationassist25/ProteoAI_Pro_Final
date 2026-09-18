@@ -492,7 +492,12 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
     # Step 1: Log2 Transformation (runs first, on the raw QC-validated intensities)
     # -----------------------------------------------------------------
     st.markdown("**Step 1: Log2 Transformation**")
-        if st.button("Apply Log2 Transformation", key=f"{key_prefix}_log2_btn"):
+    st.caption(
+        "Formula: **Log2(Protein Intensity)** — strict log2, no pseudo-count/constant. "
+        "Requires every value to already be strictly positive (no zeros, negatives, or "
+        "missing values) — run Data Cleaning & Imputation first if that isn't the case yet."
+    )
+    if st.button("Apply Log2 Transformation", key=f"{key_prefix}_log2_btn"):
         try:
             log2_raw, _ = normalization.log2_transform(base_df)
         except ValueError as e:
@@ -553,7 +558,12 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
     st.markdown("**Step 2: Normalization**")
 
     if method == "Reference-Channel Normalization":
-        
+        st.caption(
+            "Formula: **Normalized Log2 Intensity = Log2(Channel) − Log2(Reference Channel)** "
+            "— a log-ratio subtraction (equivalent to dividing the linear-scale channel by the "
+            "reference channel), computed directly on the Step 1 log2 values. Pick the sample "
+            "column that is the pooled/bridge reference channel included in the TMT plex."
+        )
         istd_choice = st.selectbox("Select reference/pooled channel (sample column)",
                                     log2_raw.columns.tolist(), key=f"{key_prefix}_istd_choice")
         if st.button("Apply Reference-Channel Normalization", key=f"{key_prefix}_apply_istd"):
@@ -566,7 +576,14 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
                 st.error(str(e))
 
     elif method == "IQR Normalization":
-                iqr_axis = st.radio("Normalization axis", ["feature", "sample", "batch"], horizontal=True,
+        st.caption(
+            "Formula: **X_norm = (X − Median(X)) ÷ IQR(X)**, computed per protein across "
+            "samples (feature-based) or per sample across proteins (sample-based), applied to "
+            "the **log2-transformed** protein intensities. Robust scaling is less sensitive "
+            "to outliers than mean/SD scaling — a standard choice for label-free proteomics, "
+            "where there's no shared spiked reference across every channel."
+        )
+        iqr_axis = st.radio("Normalization axis", ["feature", "sample", "batch"], horizontal=True,
                              index=0, key=f"{key_prefix}_iqr_axis")
         if st.button("Apply IQR Normalization", key=f"{key_prefix}_iqr_untargeted_btn"):
             batch_map = meta["Batch"] if iqr_axis == "batch" else None
@@ -578,7 +595,15 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
             st.success(f"IQR normalization complete ({iqr_axis}-based).")
 
     elif method == "Median Centering Normalization":
-        
+        st.caption(
+            "Formula: **X_norm = X − Median(Sample) + Grand Median**. For each sample, "
+            "subtracts that sample's own median (computed across proteins) so every sample is "
+            "recentered to the same level, correcting systematic sample-to-sample loading "
+            "offsets; the grand median (median of all per-sample medians) is added back so the "
+            "overall scale is preserved rather than collapsed to zero. Applied to log2 values."
+            + (" The reference/pooled channel selected above is excluded from the calculation "
+               "and dropped from the output." if is_tmt else "")
+        )
         exclude_cols = [ref_choice] if (is_tmt and ref_choice) else None
         if st.button("Apply Median Centering Normalization", key=f"{key_prefix}_apply_mediancenter"):
             working = normalization.median_center_normalize(log2_raw, exclude_cols=exclude_cols)
@@ -590,7 +615,15 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
             st.success("Median centering normalization complete.")
 
     elif method == "Global MAD-based Variance Scaling":
-                exclude_cols = [ref_choice] if (is_tmt and ref_choice) else None
+        st.caption(
+            "Formula: **X_norm = X ÷ (MAD_global × 1.4826)**. A single MAD is computed across "
+            "the entire dataset at once (not per-protein or per-sample) and used as one global "
+            "scaling factor, standardizing overall variance/spread in one step (the 1.4826 "
+            "constant rescales MAD to be comparable to a standard deviation). Applied to log2 values."
+            + (" The reference/pooled channel selected above is excluded from the calculation "
+               "and dropped from the output." if is_tmt else "")
+        )
+        exclude_cols = [ref_choice] if (is_tmt and ref_choice) else None
         if st.button("Apply Global MAD-based Variance Scaling", key=f"{key_prefix}_apply_madscale"):
             working, mad_scale_used = normalization.mad_scale_normalize(log2_raw, exclude_cols=exclude_cols)
             state[state_key_normalized] = working
@@ -663,7 +696,7 @@ with TABS[5]:
 
         st.caption(
             "Log2FC, p-value, FDR, and Significant are computed from the log2-transformed, "
-            "normalized data."
+            "normalized data — raw protein intensities are not used for inference."
         )
 
         mode = st.radio("Comparison type", ["Two-group comparison", "ANOVA (≥3 groups)"], horizontal=True)
@@ -703,6 +736,8 @@ with TABS[5]:
                     file_name=f"{comparison_name}_Statistics.csv", mime="text/csv",
                     key="dl_stats_twogroup"
                 )
+                st.caption(f"Filename includes the comparison ({comparison_name}) so results from "
+                           "different comparisons stay distinguishable.")
 
         else:
             if len(groups_available) < 3:
@@ -820,6 +855,7 @@ with TABS[4]:
                             f"Color: {g}", default_swatches[i % len(default_swatches)], key=f"pca_color_{g}"
                         )
 
+            st.caption("Optional: assign a marker style per group (defaults to circles for all).")
             marker_map = {}
             marker_cols = st.columns(min(4, len(selected_pca_groups)) or 1)
             for i, g in enumerate(selected_pca_groups):
@@ -1606,6 +1642,17 @@ def render_significant_protein_selector(key_prefix: str):
 # ===========================================================================
 with TABS[10]:
     st.header("Gene Set Enrichment Analysis")
+    st.caption(
+        "Three statistically-distinct methods: **STRING Enrichment Analysis** (Szklarczyk et "
+        "al. 2023) needs only a protein list and computes enrichment server-side against "
+        "STRING's own database; **Over-Representation Analysis (ORA)** is a hypergeometric "
+        "test computed locally against a chosen gene-set library, using your full comparison "
+        "list against an explicit background/universe; **Gene Set Enrichment Analysis (GSEA)** "
+        "(Subramanian et al. 2005) ranks every detected protein and tests where each gene set "
+        "falls in that ranking — a genuinely different algorithm from ORA, never used as a "
+        "substitute for it. **STRING and ORA/GSEA's Enrichr-backed libraries require internet "
+        "access**; GSEA can run fully offline if you upload your own .gmt gene set file."
+    )
     sig_proteins, stats_df, stats_by_gene = render_significant_protein_selector("gsea")
 
     if stats_df is not None:
@@ -1898,6 +1945,13 @@ with TABS[10]:
 # ===========================================================================
 with TABS[11]:
     st.header("Protein-Protein Interaction Network")
+    st.caption(
+        "Powered by the STRING database (Szklarczyk et al. 2023, *Nucleic Acids Research*), "
+        "the most widely used protein-protein interaction resource in proteomics — combining "
+        "physical interactions and functional associations from experiments, curated "
+        "databases, co-expression, and text-mining into one confidence score per pair. "
+        "**Requires internet access** (calls the public STRING API)."
+    )
     sig_proteins_ppi, stats_df_ppi, stats_by_gene_ppi = render_significant_protein_selector("ppi")
 
     if stats_df_ppi is not None:

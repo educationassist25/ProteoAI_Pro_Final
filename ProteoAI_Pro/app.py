@@ -493,7 +493,9 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
     # -----------------------------------------------------------------
     st.markdown("**Step 1: Log2 Transformation**")
     st.caption(
-        "Formula: **Log2(Protein Intensity)**"
+        "Formula: **Log2(Protein Intensity)** — strict log2, no pseudo-count/constant. "
+        "Requires every value to already be strictly positive (no zeros, negatives, or "
+        "missing values) — run Data Cleaning & Imputation first if that isn't the case yet."
     )
     if st.button("Apply Log2 Transformation", key=f"{key_prefix}_log2_btn"):
         try:
@@ -556,7 +558,13 @@ def render_normalization_ui(base_df, data_type, key_prefix, state, meta):
     st.markdown("**Step 2: Normalization**")
 
     if method == "Reference-Channel Normalization":
-                istd_choice = st.selectbox("Select reference/pooled channel (sample column)",
+        st.caption(
+            "Formula: **Normalized Log2 Intensity = Log2(Channel) − Log2(Reference Channel)** "
+            "— a log-ratio subtraction (equivalent to dividing the linear-scale channel by the "
+            "reference channel), computed directly on the Step 1 log2 values. Pick the sample "
+            "column that is the pooled/bridge reference channel included in the TMT plex."
+        )
+        istd_choice = st.selectbox("Select reference/pooled channel (sample column)",
                                     log2_raw.columns.tolist(), key=f"{key_prefix}_istd_choice")
         if st.button("Apply Reference-Channel Normalization", key=f"{key_prefix}_apply_istd"):
             try:
